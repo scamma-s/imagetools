@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Image Converter, Compressor & Resizer</title>
+<style>
+  /* Global box-sizing to include padding/border in width */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0; 
+    font-family: Arial, sans-serif;
+    background: white; 
+    color: #0047ab; /* bright blue */
+  }
+  /* Header constrained and centered with rounded corners on all sides */
+  header {
+    background: #007bff; /* brighter blue */
+    color: white;
+    user-select: none;
+
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 1rem;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+
+    border-radius: 8px; /* Rounded corners on all sides */
+  }
+  header nav {
+    margin-top: 0.5rem;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+  }
+  .tab-btn {
+    background: #007bff;
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: background 0.3s;
+    flex: 1 1 auto;
+    max-width: 120px;
+  }
+  .tab-btn.active {
+    background: #0047ab;
+  }
+  main {
+    max-width: 480px;
+    margin: auto;
+    padding: 1rem;
+  }
+  section {
+    background: #f0f8ff; /* very light blue */
+    border: 2px solid #007bff;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  h2 {
+    margin-top: 0;
+    color: #003d99;
+  }
+  label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+  }
+  input[type=file], select, input[type=number], button {
+    width: 100%;
+    padding: 0.5rem;
+    margin-bottom: 0.8rem;
+    border: 1.5px solid #007bff;
+    border-radius: 5px;
+    font-size: 1rem;
+    color: #003d99;
+    background: white;
+    transition: border-color 0.3s;
+  }
+  input[type=file]:focus, select:focus, input[type=number]:focus {
+    outline: none;
+    border-color: #0047ab;
+  }
+  button {
+    cursor: pointer;
+    background: #007bff;
+    color: white;
+    font-weight: 700;
+    border: none;
+  }
+  button:disabled {
+    background: #a0c4ff;
+    cursor: not-allowed;
+  }
+  img.preview {
+    max-width: 100%;
+    display: block;
+    margin: 0.5rem auto 1rem;
+    border-radius: 4px;
+  }
+  /* Responsive adjustments */
+  @media (max-width: 500px) {
+    main {
+      padding: 0.5rem;
+    }
+    button, input[type=file], select, input[type=number], .tab-btn {
+      font-size: 0.9rem;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  Image Tools
+  <nav>
+    <button class="tab-btn active" data-target="convertSection">Converter</button>
+    <button class="tab-btn" data-target="compressSection">Compressor</button>
+    <button class="tab-btn" data-target="resizeSection">Resizer</button>
+  </nav>
+</header>
+
+<main>
+  <!-- Image Converter -->
+  <section id="convertSection" class="tool-section">
+    <h2>Image Converter</h2>
+    <label for="convertFile">Upload Image</label>
+    <input type="file" id="convertFile" accept="image/*" />
+    <label for="convertFormat">Convert to format</label>
+    <select id="convertFormat">
+      <option value="image/jpeg">JPEG</option>
+      <option value="image/png">PNG</option>
+      <option value="image/webp">WebP</option>
+    </select>
+    <button id="convertBtn" disabled>Convert & Download</button>
+    <img id="convertPreview" class="preview" alt="Converted preview" />
+  </section>
+
+  <!-- Image Compressor -->
+  <section id="compressSection" class="tool-section" style="display:none;">
+    <h2>Image Compressor</h2>
+    <label for="compressFile">Upload Image</label>
+    <input type="file" id="compressFile" accept="image/*" />
+    <label for="compressQuality">Quality (0.1 to 1)</label>
+    <input type="number" id="compressQuality" min="0.1" max="1" step="0.1" value="0.8" />
+    <button id="compressBtn" disabled>Compress & Download</button>
+    <img id="compressPreview" class="preview" alt="Compressed preview" />
+  </section>
+
+  <!-- Image Resizer -->
+  <section id="resizeSection" class="tool-section" style="display:none;">
+    <h2>Image Resizer</h2>
+    <label for="resizeFile">Upload Image</label>
+    <input type="file" id="resizeFile" accept="image/*" />
+    <label for="resizeWidth">Width (px)</label>
+    <input type="number" id="resizeWidth" min="1" />
+    <label for="resizeHeight">Height (px)</label>
+    <input type="number" id="resizeHeight" min="1" />
+    <button id="resizeBtn" disabled>Resize & Download</button>
+    <img id="resizePreview" class="preview" alt="Resized preview" />
+  </section>
+</main>
+
+<script>
+  // Utilities
+  function loadImageFile(file, callback) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => callback(img);
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Tab toggle logic
+  const tabs = document.querySelectorAll('.tab-btn');
+  const sections = document.querySelectorAll('.tool-section');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      sections.forEach(s => s.style.display = 'none');
+
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.target).style.display = 'block';
+    });
+  });
+
+  // Image Converter
+  const convertFileInput = document.getElementById('convertFile');
+  const convertFormatSelect = document.getElementById('convertFormat');
+  const convertBtn = document.getElementById('convertBtn');
+  const convertPreview = document.getElementById('convertPreview');
+  let convertFile = null;
+
+  convertFileInput.addEventListener('change', () => {
+    convertFile = convertFileInput.files[0];
+    if (convertFile) {
+      loadImageFile(convertFile, img => {
+        convertPreview.src = img.src;
+        convertBtn.disabled = false;
+      });
+    } else {
+      convertPreview.src = '';
+      convertBtn.disabled = true;
+    }
+  });
+
+  convertBtn.addEventListener('click', () => {
+    if (!convertFile) return;
+    loadImageFile(convertFile, img => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const mimeType = convertFormatSelect.value;
+      canvas.toBlob(blob => {
+        downloadBlob(blob, 'converted.' + mimeType.split('/')[1]);
+      }, mimeType);
+    });
+  });
+
+  // Image Compressor
+  const compressFileInput = document.getElementById('compressFile');
+  const compressQualityInput = document.getElementById('compressQuality');
+  const compressBtn = document.getElementById('compressBtn');
+  const compressPreview = document.getElementById('compressPreview');
+  let compressFile = null;
+
+  compressFileInput.addEventListener('change', () => {
+    compressFile = compressFileInput.files[0];
+    if (compressFile) {
+      loadImageFile(compressFile, img => {
+        compressPreview.src = img.src;
+        compressBtn.disabled = false;
+      });
+    } else {
+      compressPreview.src = '';
+      compressBtn.disabled = true;
+    }
+  });
+
+  compressBtn.addEventListener('click', () => {
+    if (!compressFile) return;
+    const quality = Math.min(Math.max(parseFloat(compressQualityInput.value), 0.1), 1);
+    loadImageFile(compressFile, img => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      // Compress as JPEG
+      canvas.toBlob(blob => {
+        downloadBlob(blob, 'compressed.jpg');
+        compressPreview.src = URL.createObjectURL(blob);
+      }, 'image/jpeg', quality);
+    });
+  });
+
+  // Image Resizer
+  const resizeFileInput = document.getElementById('resizeFile');
+  const resizeWidthInput = document.getElementById('resizeWidth');
+  const resizeHeightInput = document.getElementById('resizeHeight');
+  const resizeBtn = document.getElementById('resizeBtn');
+  const resizePreview = document.getElementById('resizePreview');
+  let originalImg = null;
+
+  resizeFileInput.addEventListener('change', () => {
+    const file = resizeFileInput.files[0];
+    if (file) {
+      loadImageFile(file, img => {
+        originalImg = img;
+        resizePreview.src = img.src;
+        resizeWidthInput.value = img.width;
+        resizeHeightInput.value = img.height;
+        resizeBtn.disabled = false;
+      });
+    } else {
+      originalImg = null;
+      resizePreview.src = '';
+      resizeBtn.disabled = true;
+      resizeWidthInput.value = '';
+      resizeHeightInput.value = '';
+    }
+  });
+
+  resizeBtn.addEventListener('click', () => {
+    if (!originalImg) return;
+    let w = parseInt(resizeWidthInput.value);
+    let h = parseInt(resizeHeightInput.value);
+    if (!w || !h || w < 1 || h < 1) {
+      alert('Please enter valid width and height.');
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(originalImg, 0, 0, w, h);
+    canvas.toBlob(blob => {
+      downloadBlob(blob, 'resized.png');
+      resizePreview.src = URL.createObjectURL(blob);
+    }, 'image/png');
+  });
+</script>
+
+</body>
+</html>
